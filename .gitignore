@@ -1,0 +1,37 @@
+# Anchor and Rust build artifacts
+.anchor/
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Solana keypairs
+*.json
+!Anchor.toml
+!package.json
+!tsconfig.json
+
+# Node.js
+node_modules/
+.yarn/
+yarn.lock
+package-lock.json
+
+# Solana test artifacts
+test-ledger/
+.ammanrc.js
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# IDE and OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
