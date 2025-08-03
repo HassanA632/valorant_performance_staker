@@ -17,7 +17,7 @@ pub mod valorant_performance_ledger {
     pub fn initialize(ctx: Context<Initialize>, allowed_depositors: [Pubkey; 5]) -> Result<()> {
         let sol_holder = &mut ctx.accounts.sol_holder;
 
-        sol_holder.authority = ctx.accounts.authority.key();
+        sol_holder.authority = ctx.accounts.signer.key();
         sol_holder.allowed_depositors = allowed_depositors;
         sol_holder.deposits = [0; 5];
         sol_holder.total_collected = 0; 
@@ -63,12 +63,12 @@ pub mod valorant_performance_ledger {
 pub struct Initialize<'info> {
     #[account(
         init,
-        payer = authority,
+        payer = signer,
         space = 8 + SolHolder::INIT_SPACE 
     )]
     pub sol_holder: Account<'info, SolHolder>,
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub signer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
