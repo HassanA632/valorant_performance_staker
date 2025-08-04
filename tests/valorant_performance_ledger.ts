@@ -5,28 +5,33 @@ import { PublicKey, Keypair } from "@solana/web3.js";
 import { assert } from "chai";
 
 describe("Valorant Performance Ledger", () => {
-
   anchor.setProvider(anchor.AnchorProvider.env());
-
   const program = anchor.workspace.ValorantPerformanceLedger as Program<ValorantPerformanceLedger>;
   const provider = anchor.getProvider();
 
   // Generate new keypair for SolHolder account
-  const solHolderAccount = Keypair.generate();
+  let solHolderAccount: Keypair;
+  let depositor1: Keypair;
+  let depositor2: Keypair;
+  let depositor3: Keypair;
+  let depositor4: Keypair;
+  let depositor5: Keypair;
 
-  // Create 5 test wallet addresses 
-  const depositor1 = Keypair.generate();
-  const depositor2 = Keypair.generate();
-  const depositor3 = Keypair.generate();
-  const depositor4 = Keypair.generate();
-  const depositor5 = Keypair.generate();
+  before(() => {
+    // Create 5 test wallet addresses 
+    solHolderAccount = Keypair.generate();
+
+    depositor1 = Keypair.generate();
+    depositor2 = Keypair.generate();
+    depositor3 = Keypair.generate();
+    depositor4 = Keypair.generate();
+    depositor5 = Keypair.generate();
+
+  }
+  );
 
   describe("Contract Creation", () => {
-
-
-
     it("Should initialize the sol holder contract with 5 wallets", async () => {
-
       const allowedDepositors = [
         depositor1.publicKey,
         depositor2.publicKey,
@@ -34,13 +39,11 @@ describe("Valorant Performance Ledger", () => {
         depositor4.publicKey,
         depositor5.publicKey
       ];
-
       // Call initialize instruction
       await program.methods
         .initialize(allowedDepositors)
         .accounts({
           solHolder: solHolderAccount.publicKey,
-          authority: provider.wallet.publicKey,
         })
         .signers([solHolderAccount])
         .rpc();
@@ -122,10 +125,82 @@ describe("Valorant Performance Ledger", () => {
         solHolderAccount.publicKey
       );
 
+      console.log("Sol Holder Account Data after deposit:", solHolderData);
+
       console.log("Final depositor balance:", finalDepositorBalance);
       console.log("Final contract balance:", finalContractBalance);
+      console.log("-----------------------------------------------------");
 
     });
 
+    it("should let multiple users deposit", async () => {
+      const depositAmount = new anchor.BN(1_000_000_000); //1 SOL worth
+      // Airdrop some SOL to depositor1 for testing
+      await provider.connection.requestAirdrop(
+        depositor2.publicKey,
+        2_000_000_000 // 2 SOL
+      );
+      // Airdrop some SOL to depositor1 for testing
+      await provider.connection.requestAirdrop(
+        depositor3.publicKey,
+        2_000_000_000 // 2 SOL
+      );
+      // Airdrop some SOL to depositor1 for testing
+      await provider.connection.requestAirdrop(
+        depositor4.publicKey,
+        2_000_000_000 // 2 SOL
+      );
+      // Airdrop some SOL to depositor1 for testing
+      await provider.connection.requestAirdrop(
+        depositor5.publicKey,
+        2_000_000_000 // 2 SOL
+      );
+
+      // Wait for airdrop to confirm
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      await program.methods.deposit(depositAmount).accounts(
+        {
+          solHolder: solHolderAccount.publicKey,
+          depositor: depositor2.publicKey,
+
+        })
+        .signers([depositor2])
+        .rpc();
+
+      await program.methods.deposit(depositAmount).accounts(
+        {
+          solHolder: solHolderAccount.publicKey,
+          depositor: depositor3.publicKey,
+
+        })
+        .signers([depositor3])
+        .rpc();
+
+      await program.methods.deposit(depositAmount).accounts(
+        {
+          solHolder: solHolderAccount.publicKey,
+          depositor: depositor4.publicKey,
+
+        })
+        .signers([depositor4])
+        .rpc();
+      await program.methods.deposit(depositAmount).accounts(
+        {
+          solHolder: solHolderAccount.publicKey,
+          depositor: depositor5.publicKey,
+
+        })
+        .signers([depositor5])
+        .rpc();
+
+      const solHolderData = await program.account.solHolder.fetch(
+        solHolderAccount.publicKey
+      );
+
+      console.log("Sol Holder Account Data after deposit:", solHolderData);
+
+
+    });
   });
 });
