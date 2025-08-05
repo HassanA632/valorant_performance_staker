@@ -54,7 +54,6 @@ pub mod valorant_performance_ledger {
         sol_holder.deposits[depositor_index] = amount;
         sol_holder.total_collected += amount;
         sol_holder.depositors_count +=1;
-        
         Ok(())
     }
 }

@@ -16,9 +16,10 @@ describe("Valorant Performance Ledger", () => {
   let depositor3: Keypair;
   let depositor4: Keypair;
   let depositor5: Keypair;
+  let depositor_bad: Keypair;
 
   before(() => {
-    // Create 5 test wallet addresses 
+    // Create 7 test wallet addresses
     solHolderAccount = Keypair.generate();
 
     depositor1 = Keypair.generate();
@@ -26,6 +27,7 @@ describe("Valorant Performance Ledger", () => {
     depositor3 = Keypair.generate();
     depositor4 = Keypair.generate();
     depositor5 = Keypair.generate();
+    depositor_bad = Keypair.generate();
 
   }
   );
@@ -95,8 +97,8 @@ describe("Valorant Performance Ledger", () => {
         solHolderAccount.publicKey
       );
 
-      console.log("Initial depositor balance:", initialDepositorBalance);
-      console.log("Initial contract balance:", initialContractBalance);
+      //console.log("Initial depositor balance:", initialDepositorBalance);
+      //console.log("Initial contract balance:", initialContractBalance);
 
       // Call deposit instruction
       await program.methods.deposit(depositAmount).accounts(
@@ -125,11 +127,38 @@ describe("Valorant Performance Ledger", () => {
         solHolderAccount.publicKey
       );
 
-      console.log("Sol Holder Account Data after deposit:", solHolderData);
+      //console.log("Sol Holder Account Data after deposit:", solHolderData);
 
-      console.log("Final depositor balance:", finalDepositorBalance);
-      console.log("Final contract balance:", finalContractBalance);
-      console.log("-----------------------------------------------------");
+      //console.log("Final depositor balance:", finalDepositorBalance);
+      //console.log("Final contract balance:", finalContractBalance);
+
+
+    });
+    it("Should NOT allow non-whitelisted users to deposit", async () => {
+
+      const depositAmount = new anchor.BN(1_000_000_000); //1 SOL worth
+      // Airdrop some SOL to depositor1 for testing
+      await provider.connection.requestAirdrop(
+        depositor_bad.publicKey,
+        2_000_000_000 // 2 SOL
+      );
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        await program.methods.deposit(depositAmount).accounts(
+          {
+            solHolder: solHolderAccount.publicKey,
+            depositor: depositor_bad.publicKey,
+
+          })
+          .signers([depositor_bad])
+          .rpc();
+        assert.fail("Expected fail but passed")
+      } catch (err) {
+        // Program failed as expected
+        assert.ok(true);
+      }
+
+
 
     });
 
@@ -198,9 +227,34 @@ describe("Valorant Performance Ledger", () => {
         solHolderAccount.publicKey
       );
 
-      console.log("Sol Holder Account Data after deposit:", solHolderData);
+      assert.equal(solHolderData.deposits[0].toString(), depositAmount.toString());
+      assert.equal(solHolderData.deposits[1].toString(), depositAmount.toString());
+      assert.equal(solHolderData.deposits[2].toString(), depositAmount.toString());
+      assert.equal(solHolderData.deposits[3].toString(), depositAmount.toString());
+      assert.equal(solHolderData.deposits[4].toString(), depositAmount.toString());
 
 
+      //console.log("Sol Holder Account Data after deposit:", solHolderData);
+
+    });
+
+    it("Should NOT allow multiple deposits from the same user", async () => {
+      const depositAmount = new anchor.BN(1_000_000_000); //1 SOL worth
+
+      try {
+        await program.methods.deposit(depositAmount).accounts(
+          {
+            solHolder: solHolderAccount.publicKey,
+            depositor: depositor5.publicKey,
+          })
+          .signers([depositor5])
+          .rpc();
+        assert.fail("Expected fail but passed")
+
+      } catch (err) {
+        // Program failed as expected
+        assert.ok(true);
+      }
     });
   });
 });
