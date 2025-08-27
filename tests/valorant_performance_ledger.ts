@@ -1,16 +1,25 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import { ValorantPerformanceLedger } from "../target/types/valorant_performance_ledger";
 import { PublicKey, Keypair } from "@solana/web3.js";
 import { assert } from "chai";
+import { expect } from 'chai';
+import { AnchorError } from '@coral-xyz/anchor';
 
 describe("Valorant Performance Ledger", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.ValorantPerformanceLedger as Program<ValorantPerformanceLedger>;
   const provider = anchor.getProvider();
 
+  //expiry time for funding
+  let good_expiry_time = new BN(1956288947);
+  let bad_expiry_time = new BN(1456288947);
+
   // Generate new keypair for SolHolder account
   let solHolderAccount: Keypair;
+  let solHolderAccount2: Keypair;
+
   let depositor1: Keypair;
   let depositor2: Keypair;
   let depositor3: Keypair;
@@ -21,6 +30,7 @@ describe("Valorant Performance Ledger", () => {
   before(() => {
     // Create 7 test wallet addresses
     solHolderAccount = Keypair.generate();
+    solHolderAccount2 = Keypair.generate();
 
     depositor1 = Keypair.generate();
     depositor2 = Keypair.generate();
@@ -43,7 +53,7 @@ describe("Valorant Performance Ledger", () => {
       ];
       // Call initialize instruction
       await program.methods
-        .initialize(allowedDepositors)
+        .initialize(allowedDepositors, good_expiry_time)
         .accounts({
           solHolder: solHolderAccount.publicKey,
         })
@@ -256,5 +266,57 @@ describe("Valorant Performance Ledger", () => {
         assert.ok(true);
       }
     });
+  });
+
+  describe("Set Expiry Time", () => {
+    it("Should not allow deposits after expiry time of funding round", async () => {
+      const allowedDepositors = [
+        depositor1.publicKey,
+        depositor2.publicKey,
+        depositor3.publicKey,
+        depositor4.publicKey,
+        depositor5.publicKey
+      ];
+      // Call initialize instruction
+      await program.methods
+        .initialize(allowedDepositors, bad_expiry_time)
+        .accounts({
+          solHolder: solHolderAccount2.publicKey,
+        })
+        .signers([solHolderAccount2])
+        .rpc();
+
+      const depositAmount = new anchor.BN(1_000_000_000); //1 SOL worth
+
+      // Airdrop some SOL to depositor1 for testing
+      await provider.connection.requestAirdrop(
+        depositor1.publicKey,
+        2_000_000_000 // 2 SOL
+      );
+
+      // Wait for airdrop to confirm
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      try {
+        await program.methods
+          .deposit(depositAmount)
+          .accounts({
+            solHolder: solHolderAccount2.publicKey,
+            depositor: depositor1.publicKey,
+          })
+          .signers([depositor1])
+          .rpc();
+
+        expect.fail('Expected deposit to fail because funding time has expired');
+      } catch (err) {
+        const e = err as AnchorError;
+        expect(err).to.be.instanceOf(AnchorError);
+        expect(err.program.equals(program.programId)).to.eq(true);
+
+        // Assert on error code name
+        expect(err.error.errorCode.code).to.equal('FundingTimeExpired');
+      }
+    });
+
   });
 });

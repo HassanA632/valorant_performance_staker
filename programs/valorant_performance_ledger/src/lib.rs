@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::sysvar::clock::Clock;
 
 declare_id!("DDbQzCa6kgnfZ667QFcBGbfUYGcjoPbnKbMNgTKedF2m");
 
@@ -7,27 +8,37 @@ pub enum ErrorCode{
     #[msg("Address provided does not have permission to deposit")]
     UnauthorizedDepositAddress,
     #[msg("Address has already deposited")]
-    AlreadyDeposited
+    AlreadyDeposited,
+    #[msg("Funding Time has expired")]
+    FundingTimeExpired
 }
 
 #[program]
 pub mod valorant_performance_ledger {
+    use std::thread::current;
+
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, allowed_depositors: [Pubkey; 5]) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, allowed_depositors: [Pubkey; 5], expiry_time: i64) -> Result<()> {
         let sol_holder = &mut ctx.accounts.sol_holder;
 
         sol_holder.authority = ctx.accounts.signer.key();
         sol_holder.allowed_depositors = allowed_depositors;
         sol_holder.deposits = [0; 5];
-        sol_holder.total_collected = 0; 
+        sol_holder.total_collected = 0;
         sol_holder.depositors_count = 0;
+        sol_holder.expiry_time = expiry_time;
         Ok(())
     }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64)-> Result<()>{
         let sol_holder = &mut ctx.accounts.sol_holder;
         let depositor = &ctx.accounts.depositor;
+        let expiry_time = sol_holder.expiry_time;
+        let current_time = Clock::get()?.unix_timestamp;
+
+        //Deny deposit if expiry time of funding round reached
+        require!(current_time < expiry_time, ErrorCode::FundingTimeExpired);
 
         // Check if address executing deposit is whitelisted 
         let depositor_index = sol_holder.allowed_depositors.iter()
@@ -88,4 +99,5 @@ pub struct SolHolder {
     pub deposits: [u64; 5],              // Amount each wallet has deposited
     pub total_collected: u64,            // Total amount deposited
     pub depositors_count: u8,            // How many wallets deposited so far
+    pub expiry_time: i64,            // How many wallets deposited so far
 }
