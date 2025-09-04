@@ -2,10 +2,11 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { BN } from "@coral-xyz/anchor";
 import { SolanaGridGame } from "../target/types/solana_grid_game";
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { PublicKey, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { assert } from "chai";
 import { expect } from 'chai';
 import { AnchorError } from '@coral-xyz/anchor';
+
 
 describe("grid game", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -24,19 +25,32 @@ describe("grid game", () => {
   let depositor2: Keypair;
   let depositor3: Keypair;
   let depositor4: Keypair;
-  let depositor5: Keypair;
   let depositor_bad: Keypair;
+
+  let vaultPda: PublicKey;
+  let vaultPda2: PublicKey;
+
 
   before(() => {
     // Create 7 test wallet addresses
     solHolderAccount = Keypair.generate();
     solHolderAccount2 = Keypair.generate();
 
+    [vaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), solHolderAccount.publicKey.toBuffer()],
+      program.programId
+    );
+    [vaultPda2] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), solHolderAccount2.publicKey.toBuffer()],
+      program.programId
+    );
+
+
     depositor1 = Keypair.generate();
     depositor2 = Keypair.generate();
     depositor3 = Keypair.generate();
     depositor4 = Keypair.generate();
-    depositor5 = Keypair.generate();
+
     depositor_bad = Keypair.generate();
 
   }
@@ -49,7 +63,6 @@ describe("grid game", () => {
         depositor2.publicKey,
         depositor3.publicKey,
         depositor4.publicKey,
-        depositor5.publicKey
       ];
       // Call initialize instruction
       await program.methods
@@ -76,7 +89,7 @@ describe("grid game", () => {
       assert.equal(solHolderData.depositorsCount, 0);
 
       // Verify all allowed depositors were set
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 4; i++) {
         assert.equal(
           solHolderData.allowedDepositors[i].toString(),
           allowedDepositors[i].toString()
@@ -189,11 +202,6 @@ describe("grid game", () => {
         depositor4.publicKey,
         2_000_000_000 // 2 SOL
       );
-      // Airdrop some SOL to depositor1 for testing
-      await provider.connection.requestAirdrop(
-        depositor5.publicKey,
-        2_000_000_000 // 2 SOL
-      );
 
       // Wait for airdrop to confirm
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -224,14 +232,6 @@ describe("grid game", () => {
         })
         .signers([depositor4])
         .rpc();
-      await program.methods.deposit(depositAmount).accounts(
-        {
-          solHolder: solHolderAccount.publicKey,
-          depositor: depositor5.publicKey,
-
-        })
-        .signers([depositor5])
-        .rpc();
 
       const solHolderData = await program.account.solHolder.fetch(
         solHolderAccount.publicKey
@@ -241,7 +241,6 @@ describe("grid game", () => {
       assert.equal(solHolderData.deposits[1].toString(), depositAmount.toString());
       assert.equal(solHolderData.deposits[2].toString(), depositAmount.toString());
       assert.equal(solHolderData.deposits[3].toString(), depositAmount.toString());
-      assert.equal(solHolderData.deposits[4].toString(), depositAmount.toString());
 
 
       //console.log("Sol Holder Account Data after deposit:", solHolderData);
@@ -255,9 +254,9 @@ describe("grid game", () => {
         await program.methods.deposit(depositAmount).accounts(
           {
             solHolder: solHolderAccount.publicKey,
-            depositor: depositor5.publicKey,
+            depositor: depositor4.publicKey,
           })
-          .signers([depositor5])
+          .signers([depositor4])
           .rpc();
         assert.fail("Expected fail but passed")
 
@@ -275,7 +274,6 @@ describe("grid game", () => {
         depositor2.publicKey,
         depositor3.publicKey,
         depositor4.publicKey,
-        depositor5.publicKey
       ];
       // Call initialize instruction
       await program.methods
@@ -319,4 +317,5 @@ describe("grid game", () => {
     });
 
   });
+
 });
